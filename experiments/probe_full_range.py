@@ -3,8 +3,9 @@ import struct
 import subprocess
 import time
 import sys
+import os
 
-TARGET = "60:0F:77:03:DB:00"
+TARGET = os.environ.get("MARTIAN_MAC", "60:0F:77:03:DB:00")
 
 SOL_BLUETOOTH = 274
 BT_SECURITY = 4
@@ -18,12 +19,12 @@ def connect():
     return s
 
 def main():
-    print("[*] Đang kết nối tới RFCOMM...")
+    print(f"[*] Connecting to {TARGET} RFCOMM...")
     try:
         s = connect()
-        print("[+] KẾT NỐI THÀNH CÔNG!")
+        print("[+] CONNECTED SUCCESSFULLY!")
     except Exception as e:
-        print(f"[-] Không kết nối được: {e}")
+        print(f"[-] Connection failed: {e}")
         sys.exit(1)
 
     s.settimeout(0.08)
@@ -35,7 +36,7 @@ def main():
         pass
 
     results = {}
-    print("[*] Đang quét dải opcode từ 0x10 đến 0xFF (delay 35ms)...")
+    print("[*] Probing opcodes from 0x10 to 0xFF (delay 35ms)...")
     for op in range(0x10, 0x100):
         # < OP 00 00 >
         pkt = bytes([0x3C, op, 0x00, 0x00, 0x3E])
@@ -44,18 +45,18 @@ def main():
             time.sleep(0.035)
             resp = s.recv(1024)
             resp_type = resp[1] if len(resp) > 1 else None
-            # Bỏ qua 0x04 (NAK chuẩn)
+            # Skip 0x04 (standard NAK)
             if resp_type != 0x04:
-                print(f"[ĐẶC BIỆT] Opcode 0x{op:02X} -> Phản hồi: {resp.hex()} (Type: 0x{resp_type:02X})")
+                print(f"[SPECIAL] Opcode 0x{op:02X} -> Response: {resp.hex()} (Type: 0x{resp_type:02X})")
                 results[op] = resp.hex()
         except socket.timeout:
             pass
         except Exception as e:
-            print(f"Ngắt quãng tại 0x{op:02X}: {e}")
+            print(f"Interrupted at 0x{op:02X}: {e}")
             break
 
     print("\n" + "=" * 60)
-    print(f"TỔNG KẾT: Tìm thấy {len(results)} opcodes đặc biệt từ 0x10 đến 0xFF:")
+    print(f"SUMMARY: Found {len(results)} special opcodes from 0x10 to 0xFF:")
     for op, r_hex in results.items():
         print(f"- 0x{op:02X}: {r_hex}")
     print("=" * 60)

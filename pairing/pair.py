@@ -1,15 +1,16 @@
 import pexpect
 import sys
 import time
+import os
 
-MAC = "60:0F:77:03:DB:00"
+MAC = os.environ.get("MARTIAN_MAC", "60:0F:77:03:DB:00")
 
 def main():
     print("=" * 60)
-    print("HƯỚNG DẪN TRƯỚC KHI CHẠY:")
-    print("1. Trên đồng hồ: Bấm Nút dưới -> Setup -> Pair from app.")
-    print("   (Đèn LED phải đang nháy XANH DƯƠNG liên tục)")
-    print("2. Khi ở đúng chế độ này, mã PIN sẽ giữ sáng lâu (không bị tắt vội).")
+    print("BEFORE RUNNING:")
+    print("1. On the watch: Press Bottom button -> Setup -> Pair from app.")
+    print("   (The LED must be blinking BLUE steadily)")
+    print("2. In this mode, the passkey will stay on-screen longer.")
     print("=" * 60)
 
     child = pexpect.spawn("bluetoothctl", encoding="utf-8", timeout=40)
@@ -21,7 +22,7 @@ def main():
     child.sendline("default-agent")
     child.expect("Default agent request successful")
 
-    print("\n[*] Đang kết nối tới đồng hồ để lấy mã PIN...")
+    print(f"\n[*] Connecting to {MAC} to request pairing...")
     child.sendline(f"pair {MAC}")
 
     idx = child.expect([
@@ -33,7 +34,7 @@ def main():
 
     if idx == 0:
         print("\n" + "=" * 60)
-        pin = input(">>> NHẬP MÃ 6 SỐ ĐANG HIỆN TRÊN OLED ĐỒNG HỒ: ")
+        pin = input(">>> ENTER 6-DIGIT PASSKEY SHOWN ON WATCH OLED: ")
         print("=" * 60)
         child.sendline(pin.strip())
 
@@ -44,23 +45,23 @@ def main():
         ], timeout=20)
 
         if idx2 == 0:
-            print("\n[THÀNH CÔNG] ĐÃ GHÉP NỐI VÀ LƯU BẢO MẬT HOÀN TẤT!")
+            print("\n[SUCCESS] PAIRING AND BONDING COMPLETE!")
             child.sendline(f"trust {MAC}")
             time.sleep(1)
             child.sendline("quit")
             sys.exit(0)
         else:
-            print("\n[THẤT BẠI] Sai mã hoặc quá thời gian xác thực.")
+            print("\n[FAILED] Incorrect passkey or pairing timed out.")
             child.sendline("quit")
             sys.exit(1)
     elif idx == 1:
-        print("\n[THÀNH CÔNG] Ghép nối trực tiếp thành công!")
+        print("\n[SUCCESS] Direct pairing completed!")
         child.sendline(f"trust {MAC}")
         time.sleep(1)
         child.sendline("quit")
         sys.exit(0)
     else:
-        print("\n[LỖI] Không nhận được yêu cầu nhập PIN. Kiểm tra lại chế độ trên đồng hồ.")
+        print("\n[ERROR] No passkey prompt received. Check watch state.")
         child.sendline("quit")
         sys.exit(1)
 

@@ -2,8 +2,9 @@ import socket
 import struct
 import time
 import sys
+import os
 
-TARGET = "60:0F:77:03:DB:00"
+TARGET = os.environ.get("MARTIAN_MAC", "60:0F:77:03:DB:00")
 
 SOL_BLUETOOTH = 274
 BT_SECURITY = 4
@@ -14,42 +15,41 @@ def connect_rfcomm():
     s.setsockopt(SOL_BLUETOOTH, BT_SECURITY, struct.pack("BB", BT_SECURITY_MEDIUM, 0))
     s.settimeout(5.0)
 
-    print(f"[*] Đang cố gắng kết nối tới Martian RFCOMM Channel 1 ({TARGET})...")
+    print(f"[*] Attempting to connect to Martian RFCOMM Channel 1 ({TARGET})...")
     s.connect((TARGET, 1))
-    print("[+] KẾT NỐI THÀNH CÔNG VỚI ĐỒNG HỒ!")
+    print("[+] CONNECTED TO WATCH RFCOMM CHANNEL 1!")
     return s
 
 def send_and_recv(s, cmd_bytes, wait_sec=0.2):
-    print(f"\n[TX] Gửi: {cmd_bytes} (hex: {cmd_bytes.hex()})")
+    print(f"\n[TX] Sent: {cmd_bytes} (hex: {cmd_bytes.hex()})")
     s.send(cmd_bytes)
     time.sleep(wait_sec)
     try:
         data = s.recv(1024)
-        print(f"[RX] Nhận: {data} (hex: {data.hex()})")
+        print(f"[RX] Recv: {data} (hex: {data.hex()})")
         return data
     except socket.timeout:
-        print("[RX] Timeout không phản hồi.")
+        print("[RX] Timeout: no response.")
         return None
 
 def main():
     try:
         s = connect_rfcomm()
     except Exception as e:
-        print(f"[-] Lỗi kết nối: {e}")
-        print("[-] Đảm bảo đồng hồ đang ở màn hình 'Pair from app' để bật sóng radio.")
+        print(f"[-] Connection failed: {e}")
+        print("[-] Ensure the watch is in 'Pair from app' mode to enable radio.")
         sys.exit(1)
 
     s.settimeout(2.0)
 
-    # 1. Thử nhận gói tin chào mừng ban đầu nếu có
+    # 1. Read greeting packet if present
     try:
         init_data = s.recv(1024)
-        print(f"[RX-INIT] Đồng hồ tự gửi: {init_data} ({init_data.hex()})")
+        print(f"[RX-INIT] Watch greeting: {init_data} ({init_data.hex()})")
     except socket.timeout:
         pass
 
-    # 2. Thử nghiệm các lệnh truy vấn
-    # Trong giao thức Martian, các lệnh thường có dạng <cmd> hoặc <cmd:param>
+    # 2. Probe baseline commands
     probes = [
         b"<?>",
         b"<I>",
@@ -64,10 +64,10 @@ def main():
     for p in probes:
         send_and_recv(s, p)
 
-    print("\n[*] Giữ kết nối trong 3 giây...")
+    print("\n[*] Holding connection for 3s...")
     time.sleep(3)
     s.close()
-    print("[+] Đóng kết nối an toàn.")
+    print("[+] Connection closed safely.")
 
 if __name__ == "__main__":
     main()

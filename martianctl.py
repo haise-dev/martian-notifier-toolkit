@@ -21,7 +21,7 @@ class MartianWatch:
 
     def connect(self, timeout=25.0):
         start = time.time()
-        print(f"[*] Đang tìm và kết nối tới {self.mac}...")
+        print(f"[*] Searching and connecting to {self.mac}...")
         while time.time() - start < timeout:
             try:
                 subprocess.run(["bluetoothctl", "connect", self.mac], capture_output=True, timeout=2)
@@ -34,8 +34,8 @@ class MartianWatch:
                 s.settimeout(2.0)
                 s.connect((self.mac, 1))
                 self.sock = s
-                print(f"\n[+] KẾT NỐI THÀNH CÔNG RFCOMM CHANNEL 1!")
-                # Flush greeting
+                print(f"\n[+] Successfully connected to RFCOMM Channel 1!")
+                # Flush greeting buffer
                 self.sock.settimeout(0.3)
                 try:
                     self.sock.recv(1024)
@@ -47,12 +47,12 @@ class MartianWatch:
                 time.sleep(0.4)
                 print(".", end="", flush=True)
 
-        print("\n[-] Hết thời gian chờ kết nối. Hãy đảm bảo đồng hồ đang ở 'Pair from app'.")
+        print("\n[-] Connection timed out. Make sure the watch is in 'Pair from app' mode.")
         return False
 
     def send_packet(self, opcode, payload=b""):
         if not self.sock:
-            raise RuntimeError("Chưa kết nối tới đồng hồ.")
+            raise RuntimeError("Not connected to watch.")
         seq = 0x00
         length = len(payload)
         pkt = bytes([0x3C, opcode, seq, length]) + payload + b">"
@@ -131,20 +131,20 @@ class MartianWatch:
 def run_console(watch):
     print("=" * 60)
     print("MARTIAN NOTIFIER INTERACTIVE CONSOLE")
-    print("Các lệnh hỗ trợ:")
-    print("  info          - Đọc Firmware version và mức pin %")
-    print("  ping          - Gửi tín hiệu kiểm tra (ACK 0x03)")
-    print("  notify <text> - Gửi chuỗi text thử nghiệm lên màn hình OLED")
-    print("  sync          - Thử nghiệm đồng bộ thời gian")
-    print("  raw <hex>     - Gửi chuỗi byte hex tùy ý (ví dụ: 3c0a00003e)")
-    print("  exit / quit   - Đóng kết nối và thoát")
+    print("Available commands:")
+    print("  info          - Read firmware version and battery %")
+    print("  ping          - Send keepalive ping (checks for ACK 0x03)")
+    print("  notify <text> - Send notification string to OLED display")
+    print("  sync          - Test time synchronization routines")
+    print("  raw <hex>     - Send arbitrary framed hex bytes (e.g. 3c0a00003e)")
+    print("  exit / quit   - Close connection and exit")
     print("=" * 60)
 
     while True:
         try:
             cmd_line = input("\nmartianctl> ").strip()
         except (EOFError, KeyboardInterrupt):
-            print("\nThoát console...")
+            print("\nExiting console...")
             break
 
         if not cmd_line:
@@ -158,45 +158,45 @@ def run_console(watch):
             break
         elif cmd == "ping":
             if watch.ping():
-                print("[THÀNH CÔNG] Ping OK (ACK 0x03)!")
+                print("[SUCCESS] Ping OK (ACK 0x03)!")
             else:
-                print("[-] Ping không nhận được ACK.")
+                print("[-] Ping did not receive ACK.")
         elif cmd == "info" or cmd == "battery":
             data = watch.get_info()
             if data:
-                print(f"[+] Firmware: {data['firmware']} | Pin: {data['battery_pct']}% | Raw: {data['raw_hex']}")
+                print(f"[+] Firmware: {data['firmware']} | Battery: {data['battery_pct']}% | Raw: {data['raw_hex']}")
             else:
-                print("[-] Không đọc được info.")
+                print("[-] Failed to read info.")
         elif cmd == "notify":
             msg = arg if arg else "Hello Martian!"
-            print(f"[*] Đang gửi notify '{msg}'...")
+            print(f"[*] Sending notification '{msg}'...")
             res = watch.send_notification(msg)
-            print(f"[+] Kết quả phản hồi: {res}")
+            print(f"[+] Opcode responses: {res}")
         elif cmd == "sync":
-            print("[*] Đang thử nghiệm đồng bộ thời gian...")
+            print("[*] Running time synchronization tests...")
             res = watch.sync_time()
-            print(f"[+] Kết quả: {res}")
+            print(f"[+] Result: {res}")
         elif cmd == "raw":
             if not arg:
-                print("Cách dùng: raw <hex>")
+                print("Usage: raw <hex>")
                 continue
             resp = watch.send_raw(arg)
             print(f"[RAW TX: {arg}] -> RX: {resp}")
         else:
-            print(f"[-] Lệnh không nhận diện: '{cmd}'. Gõ 'info', 'ping', 'notify <text>', 'sync', 'raw <hex>' hoặc 'exit'.")
+            print(f"[-] Unknown command: '{cmd}'. Supported: info, ping, notify <text>, sync, raw <hex>, exit.")
 
 def main():
     parser = argparse.ArgumentParser(description="Martian Notifier CLI Control Tool")
     parser.add_argument("command", nargs="?", default="console", choices=["console", "info", "battery", "ping", "notify", "sync-time", "detect"])
     parser.add_argument("--mac", default=DEFAULT_MAC, help=f"Bluetooth MAC address of the watch (default: {DEFAULT_MAC} or MARTIAN_MAC env var)")
-    parser.add_argument("--msg", default="Hello Martian!", help="Nội dung thông báo")
-    parser.add_argument("--title", default="Test", help="Tiêu đề thông báo")
+    parser.add_argument("--msg", default="Hello Martian!", help="Notification message payload")
+    parser.add_argument("--title", default="Test", help="Notification title")
     args = parser.parse_args()
 
     watch = MartianWatch(mac=args.mac)
 
     if args.command == "detect":
-        print(f"[*] Kiểm tra thiết bị {args.mac} trong hệ thống...")
+        print(f"[*] Checking device {args.mac} in BlueZ subsystem...")
         res = subprocess.run(["bluetoothctl", "info", args.mac], capture_output=True, text=True)
         print(res.stdout)
         return
@@ -210,25 +210,25 @@ def main():
         elif args.command in ("info", "battery"):
             data = watch.get_info()
             if data:
-                print(f"[THÀNH CÔNG] Firmware Version: {data['firmware']}")
-                print(f"[THÀNH CÔNG] Dung lượng Pin: {data['battery_pct']}%")
+                print(f"[SUCCESS] Firmware Version: {data['firmware']}")
+                print(f"[SUCCESS] Battery Level: {data['battery_pct']}%")
                 print(f"[RAW HEX]: {data['raw_hex']}")
             else:
-                print("[-] Không đọc được thông tin từ đồng hồ.")
+                print("[-] Failed to retrieve info from watch.")
         elif args.command == "ping":
             if watch.ping():
-                print("[THÀNH CÔNG] Ping đồng hồ thành công (Nhận ACK 0x03)!")
+                print("[SUCCESS] Ping successful (Received ACK 0x03)!")
             else:
-                print("[-] Ping không nhận được ACK.")
+                print("[-] Ping did not receive ACK.")
         elif args.command == "notify":
             res = watch.send_notification(args.msg)
-            print("Kết quả các opcode phản hồi:", res)
+            print("Opcode responses:", res)
         elif args.command == "sync-time":
             res = watch.sync_time()
-            print("Kết quả:", res)
+            print("Result:", res)
     finally:
         watch.close()
-        print("[+] Đã đóng kết nối an toàn.")
+        print("[+] Connection closed safely.")
 
 if __name__ == "__main__":
     main()

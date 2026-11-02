@@ -2,8 +2,9 @@ import socket
 import struct
 import time
 import sys
+import os
 
-TARGET = "60:0F:77:03:DB:00"
+TARGET = os.environ.get("MARTIAN_MAC", "60:0F:77:03:DB:00")
 
 SOL_BLUETOOTH = 274
 BT_SECURITY = 4
@@ -30,14 +31,14 @@ def send(s, op, payload):
 
 def connect_with_retry(timeout_sec=20.0):
     start = time.time()
-    print("[*] Đang chờ kết nối... (Hãy vào 'Pair from app' trên đồng hồ)")
+    print("[*] Waiting for connection... (Put watch into 'Pair from app' mode)")
     while time.time() - start < timeout_sec:
         try:
             s = socket.socket(socket.AF_BLUETOOTH, socket.SOCK_STREAM, socket.BTPROTO_RFCOMM)
             s.setsockopt(SOL_BLUETOOTH, BT_SECURITY, struct.pack("BB", BT_SECURITY_MEDIUM, 0))
             s.settimeout(2.0)
             s.connect((TARGET, 1))
-            print("\n[+] ĐÃ KẾT NỐI THÀNH CÔNG!")
+            print("\n[+] CONNECTED SUCCESSFULLY!")
             return s
         except Exception:
             s.close()
@@ -52,7 +53,7 @@ def main():
 
     s.settimeout(0.4)
 
-    # Các cấu trúc payload thử nghiệm cho Notification / Display
+    # Candidate notification payload structures
     text = b"TEST NOTIFIER"
     patterns = [
         # 1. [AppID=0x01, VibeID=0x01, Text]
@@ -67,19 +68,19 @@ def main():
         b"TEST\x00NOTIFIER\x00",
     ]
 
-    print("\n--- Thử nghiệm đẩy thông báo và rung qua Opcode 0x01 và 0x02 ---")
+    print("\n--- Testing push notifications and vibration across opcodes ---")
     for op in [0x01, 0x02, 0x06, 0x07, 0x0B, 0x0D, 0x0E]:
         for i, p in enumerate(patterns):
             r = send(s, op, p)
             if r and r[1] != 0x04:
-                print(f"\n[!!! THÀNH CÔNG RỰC RỠ !!!] Opcode 0x{op:02X} chấp nhận pattern {i+1}!")
-                print(f"Phản hồi: {r.hex()}")
+                print(f"\n[!!! ACCEPTED !!!] Opcode 0x{op:02X} accepted pattern {i+1}!")
+                print(f"Response: {r.hex()}")
                 time.sleep(2)
                 s.close()
                 return
 
     s.close()
-    print("\n[+] Đã test xong các pattern.")
+    print("\n[+] Pattern sweep complete.")
 
 if __name__ == "__main__":
     main()

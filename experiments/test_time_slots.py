@@ -2,8 +2,9 @@ import socket
 import struct
 import time
 import sys
+import os
 
-TARGET = "60:0F:77:03:DB:00"
+TARGET = os.environ.get("MARTIAN_MAC", "60:0F:77:03:DB:00")
 
 SOL_BLUETOOTH = 274
 BT_SECURITY = 4
@@ -11,14 +12,14 @@ BT_SECURITY_MEDIUM = 2
 
 def connect_with_retry(timeout_sec=20.0):
     start = time.time()
-    print("[*] Đang chờ kết nối... (Hãy vào 'Pair from app' trên đồng hồ)")
+    print("[*] Waiting for connection... (Put watch into 'Pair from app' mode)")
     while time.time() - start < timeout_sec:
         try:
             s = socket.socket(socket.AF_BLUETOOTH, socket.SOCK_STREAM, socket.BTPROTO_RFCOMM)
             s.setsockopt(SOL_BLUETOOTH, BT_SECURITY, struct.pack("BB", BT_SECURITY_MEDIUM, 0))
             s.settimeout(2.0)
             s.connect((TARGET, 1))
-            print("\n[+] ĐÃ KẾT NỐI THÀNH CÔNG!")
+            print("\n[+] CONNECTED SUCCESSFULLY!")
             return s
         except Exception:
             s.close()
@@ -45,29 +46,28 @@ def main():
 
     s.settimeout(0.5)
 
-    # Thử nạp giờ 10:35 vào các thanh ghi hiển thị
     h, m, s_sec = 10, 35, 0
-    print(f"\n[*] Đang nạp giá trị Giờ {h}:{m} vào các thanh ghi...")
+    print(f"\n[*] Injecting test time {h}:{m} into register candidates...")
 
-    # 1. Thử vào 0x2E: [Hour, Minute] = [10, 35]
-    print("\n--- 1. Nạp [10, 35] vào Opcode 0x2E ---")
+    # 1. Probe 0x2E: [Hour, Minute] = [10, 35]
+    print("\n--- 1. Injecting [10, 35] into Opcode 0x2E ---")
     send(s, 0x2E, bytes([h, m]))
 
-    # 2. Thử vào 0x32: [10, 35, 0]
-    print("\n--- 2. Nạp [10, 35, 0] vào Opcode 0x32 ---")
+    # 2. Probe 0x32: [10, 35, 0]
+    print("\n--- 2. Injecting [10, 35, 0] into Opcode 0x32 ---")
     send(s, 0x32, bytes([h, m, s_sec]))
 
-    # 3. Thử vào 0x2D: [10, 35, 0, 0]
-    print("\n--- 3. Nạp [10, 35, 0, 0] vào Opcode 0x2D ---")
+    # 3. Probe 0x2D: [10, 35, 0, 0]
+    print("\n--- 3. Injecting [10, 35, 0, 0] into Opcode 0x2D ---")
     send(s, 0x2D, bytes([h, m, s_sec, 0]))
 
-    # 4. Thử vào 0x2A với đầy đủ [26, 11, 2, 10, 35, 0]
-    print("\n--- 4. Nạp [26, 11, 2, 10, 35, 0] vào Opcode 0x2A ---")
+    # 4. Probe 0x2A: [26, 11, 2, 10, 35, 0]
+    print("\n--- 4. Injecting [26, 11, 2, 10, 35, 0] into Opcode 0x2A ---")
     send(s, 0x2A, bytes([26, 11, 2, h, m, s_sec]))
 
     time.sleep(2)
     s.close()
-    print("\n[+] ĐÃ NẠP XONG GIỜ 10:35 VÀO CÁC THANH GHI!")
+    print("\n[+] Slot injection complete.")
 
 if __name__ == "__main__":
     main()

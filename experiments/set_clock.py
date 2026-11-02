@@ -2,8 +2,9 @@ import socket
 import struct
 import time
 import sys
+import os
 
-TARGET = "60:0F:77:03:DB:00"
+TARGET = os.environ.get("MARTIAN_MAC", "60:0F:77:03:DB:00")
 
 SOL_BLUETOOTH = 274
 BT_SECURITY = 4
@@ -11,14 +12,14 @@ BT_SECURITY_MEDIUM = 2
 
 def connect_with_retry(timeout_sec=20.0):
     start = time.time()
-    print("[*] Đang chờ kết nối... (Hãy vào 'Pair from app' trên đồng hồ)")
+    print("[*] Waiting for connection... (Put watch into 'Pair from app' mode)")
     while time.time() - start < timeout_sec:
         try:
             s = socket.socket(socket.AF_BLUETOOTH, socket.SOCK_STREAM, socket.BTPROTO_RFCOMM)
             s.setsockopt(SOL_BLUETOOTH, BT_SECURITY, struct.pack("BB", BT_SECURITY_MEDIUM, 0))
             s.settimeout(2.0)
             s.connect((TARGET, 1))
-            print("\n[+] ĐÃ KẾT NỐI THÀNH CÔNG!")
+            print("\n[+] CONNECTED SUCCESSFULLY!")
             return s
         except Exception:
             s.close()
@@ -53,36 +54,35 @@ def main():
     day = now.tm_mday
     year = now.tm_year % 100
 
-    print(f"\n[*] Đang cài đặt: Giờ {hour:02d}:{minute:02d}:{sec:02d} | Ngày {day:02d}/{month:02d}/20{year:02d}")
+    print(f"\n[*] Configuring: Time {hour:02d}:{minute:02d}:{sec:02d} | Date {day:02d}/{month:02d}/20{year:02d}")
 
-    # 1. Ghi vào thanh ghi Giờ 0x32 (3 bytes: HH MM SS)
-    # Thử cả Decimal và BCD
-    print("\n--- Nạp Giờ vào Opcode 0x32 (3 bytes: HH MM SS) ---")
+    # 1. Write to Time Register 0x32 (3 bytes: HH MM SS)
+    print("\n--- Injecting Time into Opcode 0x32 (3 bytes: HH MM SS) ---")
     send_pkt(s, 0x32, bytes([hour, minute, sec]))
 
-    # 2. Ghi vào thanh ghi Ngày 0x2E (2 bytes: MM DD)
-    print("\n--- Nạp Ngày vào Opcode 0x2E (2 bytes: MM DD) ---")
+    # 2. Write to Date Register 0x2E (2 bytes: MM DD)
+    print("\n--- Injecting Date into Opcode 0x2E (2 bytes: MM DD) ---")
     send_pkt(s, 0x2E, bytes([month, day]))
 
-    # 3. Ghi vào thanh ghi 0x2D (4 bytes: Year, Timezone, flags)
-    print("\n--- Nạp Opcode 0x2D (4 bytes: YYYY / Offset) ---")
+    # 3. Write to 0x2D (4 bytes: Year, Timezone, flags)
+    print("\n--- Injecting into Opcode 0x2D (4 bytes: YYYY / Offset) ---")
     send_pkt(s, 0x2D, bytes([20, year, month, day]))
 
-    # 4. Ghi bật cờ hiển thị 0x2B
-    print("\n--- Bật cờ tính năng 0x2B ---")
+    # 4. Enable display flag 0x2B
+    print("\n--- Setting feature flag 0x2B ---")
     send_pkt(s, 0x2B, bytes([0x01]))
     send_pkt(s, 0x2B, bytes([0x01, 0x01]))
 
-    # 5. Đọc lại toàn bộ để kiểm tra đồng hồ đã lưu chưa
-    print("\n--- ĐỌC LẠI CÁC THANH GHI SAU KHI NẠP ---")
-    send_pkt(s, 0x32) # Giờ
-    send_pkt(s, 0x2E) # Ngày
-    send_pkt(s, 0x2D) # 0x2D
-    send_pkt(s, 0x2B) # Cờ 0x2B
+    # 5. Read back registers to verify
+    print("\n--- Reading back registers after configuration ---")
+    send_pkt(s, 0x32)  # Time
+    send_pkt(s, 0x2E)  # Date
+    send_pkt(s, 0x2D)  # 0x2D
+    send_pkt(s, 0x2B)  # Flag 0x2B
 
     time.sleep(2)
     s.close()
-    print("\n[+] Đã nạp xong toàn bộ dữ liệu ngày giờ!")
+    print("\n[+] Time and date data successfully transmitted!")
 
 if __name__ == "__main__":
     main()
