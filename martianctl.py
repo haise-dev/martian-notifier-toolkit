@@ -4,17 +4,18 @@ import struct
 import subprocess
 import time
 import sys
+import os
 import argparse
 import readline
 
-TARGET_MAC = "60:0F:77:03:DB:00"
+DEFAULT_MAC = os.environ.get("MARTIAN_MAC", "60:0F:77:03:DB:00")
 
 SOL_BLUETOOTH = 274
 BT_SECURITY = 4
 BT_SECURITY_MEDIUM = 2
 
 class MartianWatch:
-    def __init__(self, mac=TARGET_MAC):
+    def __init__(self, mac=DEFAULT_MAC):
         self.mac = mac
         self.sock = None
 
@@ -187,15 +188,16 @@ def run_console(watch):
 def main():
     parser = argparse.ArgumentParser(description="Martian Notifier CLI Control Tool")
     parser.add_argument("command", nargs="?", default="console", choices=["console", "info", "battery", "ping", "notify", "sync-time", "detect"])
+    parser.add_argument("--mac", default=DEFAULT_MAC, help=f"Bluetooth MAC address of the watch (default: {DEFAULT_MAC} or MARTIAN_MAC env var)")
     parser.add_argument("--msg", default="Hello Martian!", help="Nội dung thông báo")
     parser.add_argument("--title", default="Test", help="Tiêu đề thông báo")
     args = parser.parse_args()
 
-    watch = MartianWatch()
+    watch = MartianWatch(mac=args.mac)
 
     if args.command == "detect":
-        print(f"[*] Kiểm tra thiết bị {TARGET_MAC} trong hệ thống...")
-        res = subprocess.run(["bluetoothctl", "info", TARGET_MAC], capture_output=True, text=True)
+        print(f"[*] Kiểm tra thiết bị {args.mac} trong hệ thống...")
+        res = subprocess.run(["bluetoothctl", "info", args.mac], capture_output=True, text=True)
         print(res.stdout)
         return
 

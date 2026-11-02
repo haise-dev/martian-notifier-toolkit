@@ -70,30 +70,62 @@ sudo systemctl restart bluetooth
 1. On the watch: Double-click the **Bottom-Left button** to enter Menu $\to$ navigate to **`Setup`** $\to$ select **`Android`** $\to$ select **`Pair from app`** (LED will flash blue).
 2. Run the pairing helper:
 ```bash
-python3 pair_agent.py
+python3 pairing/pair_agent.py
 ```
 3. When prompted on the watch screen, press the **Top-Left button** to confirm pairing. The device link key will be permanently stored by BlueZ.
 
 ---
 
-## Included Tools
+## Repository Structure
 
-| Script | Purpose |
-| :--- | :--- |
-| **`martianctl.py`** | Primary CLI management tool (`info`, `battery`, `ping`, `console`). |
-| **`martian_lab.py`** | Interactive multi-threaded session manager that maintains a live, permanent RFCOMM connection without timeout disconnects. |
-| **`probe_opcodes.py`** | Fuzzing utility that systematically sweeps all 256 byte opcodes across the serial channel. |
-| **`set_clock.py`** | Standalone script that transmits system timestamp, calendar date, and timezone offsets to the watch. |
-| **`auto_probe_time.py`** | Safe-timed register sequence analyzer (prevents CSR8670 buffer crashes). |
+```text
+├── martianctl.py            # Primary CLI tool (telemetry, ping, console, notify)
+├── martian_lab.py           # Persistent multi-threaded interactive developer console
+├── PROTOCOL.md              # Full binary protocol framing & opcode specification
+├── HARDWARE.md              # Silicon teardown, dual-battery guide, 9mm micro-USB quirk
+├── README.md                # Project documentation and quickstart guide
+├── LICENSE                  # MIT License
+├── pairing/                 # BlueZ D-Bus authentication agents & pairing automation
+│   ├── martian_agent.py     # Custom BlueZ D-Bus Agent (handles PIN/passkey requests)
+│   ├── pair_agent.py        # Automated pairing runner with KeyboardDisplay agent
+│   ├── pair.py              # Interactive PIN pairing script
+│   └── interactive_pair.py  # User-prompted passkey verification
+└── experiments/             # Reverse-engineering fuzzers, probes, and test scripts
+    ├── probe_opcodes.py     # 256-byte serial opcode sweeper
+    ├── probe_full_range.py  # 0x10-0xFF register probe
+    ├── set_clock.py         # Time, date, and layout injector
+    ├── auto_probe_time.py   # Safe-delay sequence analyzer
+    └── test_*.py            # Subsystem test scripts (vibe, layout, settings)
+```
 
-### CLI Example:
+---
+
+## CLI & Tooling Reference
+
+The primary tool is **`martianctl.py`**. You can specify your watch's MAC address via the `--mac` flag or by setting the `MARTIAN_MAC` environment variable:
+
 ```bash
 # Query hardware telemetry and battery
-./martianctl.py info
+./martianctl.py info --mac 60:0F:77:03:DB:00
 
-# Enter persistent interactive mode
+# Ping watch (checks for ACK 0x03)
+./martianctl.py ping
+
+# Enter persistent interactive session (prevents connection timeout)
 ./martianctl.py console
 ```
+
+### Persistent Live Lab (`martian_lab.py`):
+For developers exploring new opcodes without being dropped by the watch's 20-second idle timeout, `martian_lab.py` maintains an active background keep-alive thread:
+
+```bash
+./martian_lab.py [OPTIONAL_MAC]
+```
+Inside the lab prompt:
+- `time`: Injects system time, timestamp, and calendar date.
+- `date <MM> <DD>`: Injects custom month and day.
+- `probe <opcode_hex>`: Sweeps payload lengths (1–16 bytes) against an opcode to discover input acceptance.
+- `send <opcode_hex> [data_hex]`: Sends arbitrary framed binary packets.
 
 ---
 

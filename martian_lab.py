@@ -4,17 +4,18 @@ import struct
 import subprocess
 import time
 import sys
+import os
 import threading
 import readline
 
-TARGET_MAC = "60:0F:77:03:DB:00"
+DEFAULT_MAC = os.environ.get("MARTIAN_MAC", "60:0F:77:03:DB:00")
 
 SOL_BLUETOOTH = 274
 BT_SECURITY = 4
 BT_SECURITY_MEDIUM = 2
 
 class MartianLab:
-    def __init__(self, mac=TARGET_MAC):
+    def __init__(self, mac=DEFAULT_MAC):
         self.mac = mac
         self.sock = None
         self.running = False
@@ -180,7 +181,8 @@ def run_interactive(lab):
     print("[+] Đã ngắt kết nối an toàn.")
 
 def main():
-    lab = MartianLab()
+    mac = sys.argv[1] if len(sys.argv) > 1 and not sys.argv[1].startswith("-") else DEFAULT_MAC
+    lab = MartianLab(mac=mac)
     if not lab.connect():
         sys.exit(1)
     run_interactive(lab)
